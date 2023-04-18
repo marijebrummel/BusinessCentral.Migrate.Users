@@ -1,0 +1,293 @@
+OBJECT Codeunit 50014 Export Permissions to AL
+{
+  OBJECT-PROPERTIES
+  {
+    Date=17-04-23;
+    Time=10:56:46;
+    Modified=Yes;
+    Version List=Export Permissions to Business Central;
+  }
+  PROPERTIES
+  {
+    OnRun=VAR
+            TempBlob@50000 : Record 99008535;
+            ZipStream@50001 : OutStream;
+            DownloadStream@50003 : InStream;
+            FileName@50004 : Text;
+          BEGIN
+            TempBlob.Blob.CREATEOUTSTREAM(ZipStream);
+            ForEachPermissionSetGenerateALFile(ZipStream);
+            TempBlob.Blob.CREATEINSTREAM(DownloadStream);
+            FileName := 'Permissions.zip';
+            DOWNLOADFROMSTREAM(DownloadStream, 'Download', '', '', FileName);
+          END;
+
+  }
+  CODE
+  {
+
+    LOCAL PROCEDURE ForEachPermissionSetGenerateALFile@50002(VAR ZipStream@50000 : OutStream);
+    VAR
+      PermissionSet@50001 : Record 2000000004;
+      ObjectID@50002 : Integer;
+    BEGIN
+      ObjectID := 50000;
+
+      PermissionSet.FINDSET;
+      REPEAT
+        AddPermissionsToZip(PermissionSet, ObjectID, ZipStream);
+        ObjectID += 1;
+      UNTIL PermissionSet.NEXT = 0;
+    END;
+
+    LOCAL PROCEDURE AddPermissionsToZip@50009(PermissionSet@50004 : Record 2000000004;ObjectID@50003 : Integer;VAR ZipStream@50000 : OutStream);
+    VAR
+      TempBlob@50002 : Record 99008535;
+      OutStr@50001 : OutStream;
+      InStr@50005 : InStream;
+    BEGIN
+      IF NOT HasPermissions(PermissionSet."Role ID") THEN
+        EXIT;
+
+      TempBlob.Blob.CREATEOUTSTREAM(OutStr);
+
+      OpenALObject(ObjectID, PermissionSet."Role ID", OutStr);
+      GenerateALFile(PermissionSet."Role ID", OutStr);
+      CloseALObject(OutStr);
+      TempBlob.Blob.CREATEINSTREAM(InStr);
+      AddStreamToZipStrem(ZipStream, InStr, DELCHR(PermissionSet.Name, '=', '.->\/') + '.al');
+    END;
+
+    LOCAL PROCEDURE GenerateALFile@50003(RoleID@50000 : Code[20];VAR Stream@50002 : OutStream);
+    VAR
+      Permission@50001 : TEMPORARY Record 2000000005;
+      i@50003 : Integer;
+    BEGIN
+      GetPermissions(Permission, RoleID);
+
+      i := 1;
+      Permission.SETAUTOCALCFIELDS("Object Name");
+      Permission.FINDSET;
+      REPEAT
+        IF i = Permission.COUNT THEN
+          Stream.WRITETEXT(GeneratePemissionLine(Permission) + ';' + CRLF)
+        ELSE
+          Stream.WRITETEXT(GeneratePemissionLine(Permission) + ',' + CRLF);
+        i += 1;
+      UNTIL Permission.NEXT = 0;
+    END;
+
+    LOCAL PROCEDURE OpenALObject@50004(ObjectID@50002 : Integer;PermissionSetName@50003 : Text;VAR Stream@50000 : OutStream);
+    BEGIN
+      Stream.WRITETEXT('permissionset ' + FORMAT(ObjectID) + ' "' + PermissionSetName + '"' + CRLF);
+      Stream.WRITETEXT('{' + CRLF);
+      Stream.WRITETEXT('    Assignable = true;' + CRLF);
+      Stream.WRITETEXT('    Permissions =' + CRLF);
+    END;
+
+    LOCAL PROCEDURE GeneratePemissionLine@50005(Permission@50001 : Record 2000000005) ALPermission : Text;
+    BEGIN
+      ALPermission := '        ';
+      ALPermission += LOWERCASE(DELCHR(FORMAT(Permission."Object Type")));
+      ALPermission += ' "';
+      ALPermission += Permission."Object Name";
+      ALPermission += '"=';
+      IF (Permission."Read Permission" <> Permission."Read Permission"::" ") AND (Permission."Object Type" = Permission."Object Type"::"Table Data") THEN
+        ALPermission += 'R';
+      IF Permission."Insert Permission" <> Permission."Insert Permission"::" " THEN
+        ALPermission += 'I';
+      IF Permission."Modify Permission" <> Permission."Modify Permission"::" " THEN
+        ALPermission += 'M';
+      IF Permission."Delete Permission" <> Permission."Delete Permission"::" " THEN
+        ALPermission += 'D';
+      IF (Permission."Execute Permission" = Permission."Execute Permission"::Yes) AND (Permission."Object Type" >= Permission."Object Type"::Report) THEN
+        ALPermission += 'X';
+    END;
+
+    LOCAL PROCEDURE CloseALObject@50006(VAR Stream@50000 : OutStream);
+    BEGIN
+      Stream.WRITETEXT('}');
+    END;
+
+    LOCAL PROCEDURE AddStreamToZipStrem@50000(ZipStream@50007 : OutStream;StreamToAdd@50006 : InStream;PathInArchive@50005 : Text);
+    VAR
+      ZipArchiveLocal@50004 : DotNet "'System.IO.Compression, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.Compression.ZipArchive";
+      ZipArchiveEntry@50003 : DotNet "'System.IO.Compression, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.Compression.ZipArchiveEntry";
+      StreamReader@50002 : DotNet "'mscorlib'.System.IO.StreamReader";
+      StreamWriter@50001 : DotNet "'mscorlib'.System.IO.StreamWriter";
+      Encoding@50000 : DotNet "'mscorlib'.System.Text.Encoding";
+      ZipArchiveMode@50008 : DotNet "'System.IO.Compression, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.Compression.ZipArchiveMode";
+    BEGIN
+      ZipArchiveLocal := ZipArchiveLocal.ZipArchive(ZipStream,ZipArchiveMode.Update,TRUE);
+      ZipArchiveEntry := ZipArchiveLocal.CreateEntry(PathInArchive);
+      StreamReader := StreamReader.StreamReader(StreamToAdd,Encoding.Default);
+      StreamWriter := StreamWriter.StreamWriter(ZipArchiveEntry.Open,StreamReader.CurrentEncoding);
+      StreamWriter.Write(StreamReader.ReadToEnd);
+      StreamWriter.Close;
+      StreamReader.Close;
+    END;
+
+    LOCAL PROCEDURE HasPermissions@50001(RoleID@50001 : Code[20]) : Boolean;
+    VAR
+      Permission@50000 : TEMPORARY Record 2000000005;
+    BEGIN
+      GetPermissions(Permission, RoleID);
+      EXIT(NOT Permission.ISEMPTY);
+    END;
+
+    LOCAL PROCEDURE CRLF@50007() LineFeed : Text[2];
+    BEGIN
+      LineFeed[1] := 13;
+      LineFeed[2] := 10;
+    END;
+
+    LOCAL PROCEDURE GetPermissions@50011(VAR PermissionBuffer@50000 : Record 2000000005;RoleID@50001 : Code[20]);
+    VAR
+      Permission@50002 : Record 2000000005;
+    BEGIN
+      IF NOT PermissionBuffer.ISTEMPORARY THEN
+        ERROR('Permissionbuffer should be marked as a temporary table');
+
+      Permission.SETRANGE("Role ID", RoleID);
+      Permission.SETRANGE("Object Type", Permission."Object Type"::"Table Data", Permission."Object Type"::Query);
+      IF Permission.FINDSET THEN REPEAT
+        IF (NOT SkipThisObject(Permission."Object ID")) AND (Permission."Object Type" <> Permission."Object Type"::Table) THEN BEGIN
+          PermissionBuffer :=Permission;
+          PermissionBuffer.INSERT;
+        END;
+      UNTIL Permission.NEXT = 0;
+    END;
+
+    LOCAL PROCEDURE SkipThisObject@50008(ObjectID@50000 : Integer) Skip : Boolean;
+    BEGIN
+      OnSkipThisObject(ObjectID, Skip);
+    END;
+
+    [Integration]
+    LOCAL PROCEDURE OnSkipThisObject@50010(ObjectID@50000 : Integer;VAR Skip@50001 : Boolean);
+    BEGIN
+    END;
+
+    BEGIN
+    END.
+  }
+}
+
+OBJECT Codeunit 50015 Stkip Permission Object
+{
+  OBJECT-PROPERTIES
+  {
+    Date=17-04-23;
+    Time=10:54:11;
+    Modified=Yes;
+    Version List=Export Permissions to Business Central;
+  }
+  PROPERTIES
+  {
+    OnRun=BEGIN
+          END;
+
+  }
+  CODE
+  {
+
+    [EventSubscriber(Codeunit,50014,OnSkipThisObject)]
+    LOCAL PROCEDURE OnSkip@50001(ObjectID@50000 : Integer;VAR Skip@50001 : Boolean);
+    BEGIN
+      IF (ObjectID >= 11095585) AND (ObjectID <= 14125600) THEN // Skip all existing Add-On products...
+        Skip := TRUE;
+
+      IF ObjectID >= 2000000000 THEN
+        Skip := TRUE;
+
+      IF ObjectID = 9080 THEN
+        Skip := TRUE;
+
+      IF ObjectID = 9081 THEN
+        Skip := TRUE;
+
+      IF ObjectID = 5330 THEN
+        Skip := TRUE;
+
+      IF (ObjectID >= 50000) AND (ObjectID <= 99999) THEN // Skip customizations in C/Side
+        Skip := TRUE;
+
+      IF ObjectID = 0 THEN
+        Skip := TRUE;
+
+      IF ObjectID = 350 THEN
+        Skip := TRUE;
+
+      IF ObjectID = 9701 THEN
+        Skip := TRUE;
+    END;
+
+    BEGIN
+    END.
+  }
+}
+
+OBJECT Codeunit 50017 Export Users & Permission Sets
+{
+  OBJECT-PROPERTIES
+  {
+    Date=18-04-23;
+    Time=10:27:17;
+    Modified=Yes;
+    Version List=Export Permissions to Business Central;
+  }
+  PROPERTIES
+  {
+    OnRun=VAR
+            TempBlob@50000 : Record 99008535;
+            OutStr@50001 : OutStream;
+            InStr@50002 : InStream;
+            FileName@50003 : Text;
+          BEGIN
+            TempBlob.Blob.CREATEOUTSTREAM(OutStr);
+            CreateLineInCSVBufferForEachUser(OutStr);
+            TempBlob.Blob.CREATEINSTREAM(InStr);
+            FileName := 'UserPermissionSets.csv';
+            DOWNLOADFROMSTREAM(InStr, 'Download', '', '', FileName);
+          END;
+
+  }
+  CODE
+  {
+
+    LOCAL PROCEDURE CreateLineInCSVBufferForEachUser@50001(VAR OutStr@50000 : OutStream);
+    VAR
+      User@50001 : Record 2000000120;
+      UserPermissionSets@50003 : Text;
+      i@50002 : Integer;
+    BEGIN
+      User.SETRANGE(State, User.State::Enabled);
+      User.FINDSET;
+      REPEAT
+        OutStr.WRITETEXT(AddPermissionSets(User."Full Name", User."User Security ID"));
+      UNTIL User.NEXT = 0;
+    END;
+
+    LOCAL PROCEDURE AddPermissionSets@50000(UserPermissionSets@50003 : Text;UserSecurityID@50001 : GUID) : Text;
+    VAR
+      AccessControl@50002 : Record 2000000053;
+    BEGIN
+      AccessControl.SETRANGE("User Security ID", UserSecurityID);
+      IF AccessControl.FINDSET THEN REPEAT
+        UserPermissionSets += ';' + AccessControl."Role ID";
+      UNTIL AccessControl.NEXT = 0;
+
+      EXIT(UserPermissionSets + CRLF);
+    END;
+
+    LOCAL PROCEDURE CRLF@50007() LineFeed : Text[2];
+    BEGIN
+      LineFeed[1] := 13;
+      LineFeed[2] := 10;
+    END;
+
+    BEGIN
+    END.
+  }
+}
+

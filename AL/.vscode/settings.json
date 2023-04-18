@@ -1,0 +1,7 @@
+{
+    "al.ruleSetPath": "_PTE.ruleset.json",
+	"al.codeAnalyzers": [
+		
+	],
+	"al.enableCodeAnalysis": true
+}

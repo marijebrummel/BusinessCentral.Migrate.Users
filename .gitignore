@@ -1,0 +1,11 @@
+AL/.vscode/*
+Development/*
+!AL/.vscode/settings.json
+!AL/.vscode/tasks.json
+!AL/.vscode/extensions.json
+translations/PrintVis.g.xlf
+AL/.vscode/launch.json
+AL/.alpackages/
+*.app
+AL/.alcache/*
+.history
