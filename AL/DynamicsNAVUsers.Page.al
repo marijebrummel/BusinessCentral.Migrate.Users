@@ -22,6 +22,14 @@ page 88888 "PTE Dynamics NAV Users"
                 {
                     ApplicationArea = All;
                 }
+                field("Is Super User"; Rec.IsSuperUser())
+                {
+                    ApplicationArea = All;
+                }
+                field("Is Enabled"; Rec.IsEnabled())
+                {
+                    ApplicationArea = All;
+                }
             }
         }
         area(Factboxes)

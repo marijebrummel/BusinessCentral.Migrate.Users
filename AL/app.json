@@ -2,7 +2,7 @@
   "id": "c8573aa0-f9f2-4a9c-800a-b37cdae74bf4",
   "name": "Import Dynamics NAV Permission Sets",
   "publisher": "Marije Jennifer Brummel",
-  "version": "1.0.0.0",
+  "version": "1.0.20230602.0",
   "brief": "",
   "description": "",
   "privacyStatement": "",
@@ -10,8 +10,7 @@
   "help": "",
   "url": "",
   "logo": "",
-  "dependencies": [ 
-],
+  "dependencies": [ ],
   "screenshots": [],
   "platform": "1.0.0.0",
   "application": "20.0.0.0",

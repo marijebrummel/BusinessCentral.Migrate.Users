@@ -81,4 +81,46 @@ table 88888 "PTE Dynamics NAV User"
                 if NAVPermissionSet.Insert() then;
             end;
     end;
+
+    procedure IsSuperUser(): Boolean
+    var
+        User: Record User;
+        AccessControl: Record "Access Control";
+        PermissionSetBuffer: Record "Permission Set Buffer" temporary;
+    begin
+        PermissionSetBuffer.FillRecordBuffer();
+        User.SetRange("Full Name", Rec."Full Name");
+        if not User.FindFirst() then
+            exit(false);
+
+        AccessControl.SetRange("Role ID", 'SUPER');
+        AccessControl.SetRange("User Security ID", User."User Security ID");
+        exit(not AccessControl.IsEmpty());
+    end;
+
+    procedure EnableDisable()
+    var
+        User: Record User;
+    begin
+        User.SetRange("Full Name", Rec."Full Name");
+        if not User.FindFirst() then
+            exit;
+
+        if User.State = User.State::Enabled then
+            User.Validate(State, User.State::Disabled)
+        else
+            User.Validate(State, User.State::Enabled);
+        User.Modify(true);
+    end;
+
+    procedure IsEnabled(): Boolean
+    var
+        User: Record User;
+    begin
+        User.SetRange("Full Name", Rec."Full Name");
+        if not User.FindFirst() then
+            exit(false);
+        exit(User.State = User.State::Enabled);
+    end;
+
 }

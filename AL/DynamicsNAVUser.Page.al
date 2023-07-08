@@ -19,6 +19,15 @@ page 88889 "PTE Dynamics NAV User"
                 {
                     ApplicationArea = All;
                 }
+                field("Is Super User"; Rec.IsSuperUser())
+                {
+                    ApplicationArea = All;
+                }
+                field("Is Enabled"; Rec.IsEnabled())
+                {
+                    ApplicationArea = All;
+                }
+
             }
             part(Lines; "PTE Dynamics NAV Perm. Sets")
             {
@@ -43,6 +52,16 @@ page 88889 "PTE Dynamics NAV User"
         }
         area(Processing)
         {
+            action(EnableDisable)
+            {
+                Caption = 'Change Enabled or Disabled';
+                Image = RemoveContacts;
+                ApplicationArea = All;
+                trigger OnAction()
+                begin
+                    Rec.EnableDisable();
+                end;
+            }
             action(AssignPermissions)
             {
                 Caption = 'Assign Permissions';
